@@ -69,7 +69,7 @@ export default function App() {
 
   return (
     <div style={{ padding: 24, fontFamily: "sans-serif" }}>
-      <h1>React MVP: расчёт ядро-ядерного потенциала</h1>
+      <h1>Расчёт ядро-ядерного потенциала</h1>
       <p>{status}</p>
 
       <div style={{ marginBottom: 16, display: "flex", gap: 8, flexWrap: "wrap" }}>
