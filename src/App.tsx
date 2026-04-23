@@ -10,6 +10,7 @@ const initialParams: CalculationParams = {
   projectileA: 4,
   targetZ: 14,
   targetA: 28,
+  energyMeV: 30,
   rMin: 0,
   rMax: 15,
   dR: 0.1,

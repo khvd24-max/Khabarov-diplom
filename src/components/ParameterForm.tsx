@@ -30,6 +30,8 @@ export function ParameterForm({
       <label>Мишень Z <input type="number" value={params.targetZ} onChange={(e) => setField("targetZ", +e.target.value)} /></label>
       <label>Мишень A <input type="number" value={params.targetA} onChange={(e) => setField("targetA", +e.target.value)} /></label>
 
+      <label>Энергия (MeV) <input type="number" step="0.1" value={params.energyMeV} onChange={(e) => setField("energyMeV", +e.target.value)}/></label>
+
       <label>R_min <input type="number" step="0.1" value={params.rMin} onChange={(e) => setField("rMin", +e.target.value)} /></label>
       <label>R_max <input type="number" step="0.1" value={params.rMax} onChange={(e) => setField("rMax", +e.target.value)} /></label>
       <label>dR <input type="number" step="0.01" value={params.dR} onChange={(e) => setField("dR", +e.target.value)} /></label>

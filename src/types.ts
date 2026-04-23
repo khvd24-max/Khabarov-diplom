@@ -3,6 +3,7 @@ export type CalculationParams = {
   projectileA: number;
   targetZ: number;
   targetA: number;
+  energyMeV: number;
   rMin: number;
   rMax: number;
   dR: number;
