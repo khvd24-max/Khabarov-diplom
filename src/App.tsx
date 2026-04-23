@@ -6,19 +6,19 @@ import { exportPreset, exportResult } from "./utils/fileUtils";
 import type { CalculationParams, PotentialPoint, PresetFile } from "./types";
 
 const initialParams: CalculationParams = {
-  projectileZ: 2,
-  projectileA: 4,
-  targetZ: 14,
-  targetA: 28,
+  projectileZ: 3,
+  projectileA: 6,
+  targetZ: 20,
+  targetA: 48,
   energyMeV: 30,
   rMin: 0,
-  rMax: 15,
+  rMax: 20,
   dR: 0.1,
-  v0: 120,
-  rv: 4.5,
+  v0: 50,
+  rv: 1.2,
   av: 0.65,
-  w0: 25,
-  rw: 5.2,
+  w0: 12,
+  rw: 1.2,
   aw: 0.75,
 };
 
