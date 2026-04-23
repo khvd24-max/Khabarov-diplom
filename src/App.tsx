@@ -1,116 +1,84 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { ParameterForm } from "./components/ParameterForm";
 import { PotentialChart } from "./components/PotentialChart";
 import { calculatePotential } from "./utils/calculatePotential";
-import { exportPreset, exportResult } from "./utils/fileUtils";
-import type { CalculationParams, PotentialPoint, PresetFile } from "./types";
+import type { CalculationParams, PotentialPoint } from "./types";
 
 const initialParams: CalculationParams = {
   projectileZ: 3,
   projectileA: 6,
   targetZ: 20,
   targetA: 48,
+
   energyMeV: 30,
+
   rMin: 0,
   rMax: 20,
-  dR: 0.1,
-  v0: 50,
-  rv: 1.2,
-  av: 0.65,
+  dR: 0.2,
+
+  projectileDensityModel: "2pF",
+  targetDensityModel: "2pF",
+
+  r0Proj: 1.07,
+  aProj: 0.55,
+
+  r0Targ: 1.07,
+  aTarg: 0.54,
+
+  nnModel: "M3Y-Reid",
+  useDensityDependence: true,
+
+  nReal: 1.0,
+
   w0: 12,
   rw: 1.2,
   aw: 0.75,
+
+  rc: 1.25,
 };
+
+function exportJson(points: PotentialPoint[], params: CalculationParams) {
+  const blob = new Blob([JSON.stringify({ params, points }, null, 2)], {
+    type: "application/json",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "potential.json";
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 export default function App() {
   const [params, setParams] = useState<CalculationParams>(initialParams);
   const [points, setPoints] = useState<PotentialPoint[]>([]);
   const [status, setStatus] = useState("Готово");
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const runCalculation = () => {
-    try {
-      setStatus("Расчёт...");
-      const result = calculatePotential(params);
-      setPoints(result.points);
-      setStatus(`Успешно: ${result.mode}`);
-    } catch (error) {
-      console.error(error);
-      setStatus("Ошибка при расчёте");
-    }
-  };
-
-  const handleExportPreset = () => {
-    const name =
-      window.prompt("Введите название пресета", "demo-preset") || "demo-preset";
-    exportPreset(name, params);
-  };
-
-  const handleExportResult = () => {
-    if (!points.length) return;
-    exportResult(params, points);
-  };
-
-  const handleImportPreset = async (file: File) => {
-    try {
-      const text = await file.text();
-      const parsed = JSON.parse(text) as PresetFile;
-
-      if (!parsed.params) {
-        throw new Error("Некорректный формат пресета");
-      }
-
-      setParams(parsed.params);
-      setStatus(`Пресет "${parsed.name}" загружен`);
-    } catch (error) {
-      console.error(error);
-      setStatus("Ошибка загрузки пресета");
-    }
+    setStatus("Расчёт...");
+    const result = calculatePotential(params);
+    setPoints(result.points);
+    setStatus(`Успешно (${result.mode})`);
   };
 
   return (
-    <div style={{ padding: 24, fontFamily: "sans-serif" }}>
+    <div style={{ padding: 24, display: "grid", gap: 24 }}>
       <h1>Расчёт ядро-ядерного потенциала</h1>
       <p>{status}</p>
 
-      <div style={{ marginBottom: 16, display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <button onClick={() => fileInputRef.current?.click()}>
-          Загрузить пресет
-        </button>
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".json"
-          style={{ display: "none" }}
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) {
-              handleImportPreset(file);
-            }
-            e.currentTarget.value = "";
-          }}
-        />
-      </div>
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "420px 1fr",
-          gap: 24,
-          alignItems: "start",
-        }}
-      >
+      <div style={{ display: "grid", gridTemplateColumns: "460px 1fr", gap: 24 }}>
         <ParameterForm
           params={params}
           onChange={setParams}
           onRun={runCalculation}
-          onExportPreset={handleExportPreset}
-          onExportResult={handleExportResult}
-          hasResult={points.length > 0}
         />
 
-        <PotentialChart points={points} />
+        <div>
+          <button onClick={() => exportJson(points, params)} disabled={!points.length}>
+            Экспорт JSON
+          </button>
+          <PotentialChart points={points} />
+        </div>
       </div>
     </div>
   );

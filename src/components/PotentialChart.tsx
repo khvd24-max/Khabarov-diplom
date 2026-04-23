@@ -22,10 +22,27 @@ export function PotentialChart({ points }: Props) {
       data={[
         {
           x: points.map((p) => p.r),
+          y: points.map((p) => p.vN),
+          type: "scatter",
+          mode: "lines",
+          name: "V_N(R)",
+          line: { color: "#1f77b4", width: 2 },
+        },
+        {
+          x: points.map((p) => p.r),
+          y: points.map((p) => p.vC),
+          type: "scatter",
+          mode: "lines",
+          name: "V_C(R)",
+          line: { color: "#ff7f0e", width: 2, dash: "dot" },
+        },
+        {
+          x: points.map((p) => p.r),
           y: points.map((p) => p.v),
           type: "scatter",
           mode: "lines",
           name: "V(R)",
+          line: { color: "#2ca02c", width: 3 },
         },
         {
           x: points.map((p) => p.r),
@@ -33,16 +50,33 @@ export function PotentialChart({ points }: Props) {
           type: "scatter",
           mode: "lines",
           name: "W(R)",
+          line: { color: "#d62728", width: 2 },
         },
       ]}
       layout={{
-        autosize: true,
-        title: { text: "Графики V(R) и W(R)" },
+        title: { text: "Ядро-ядерный потенциал" },
         xaxis: { title: { text: "R (fm)" } },
         yaxis: { title: { text: "Potential (MeV)" } },
+        autosize: true,
+        width: 950,
+        height: 540,
+        legend: {
+          orientation: "h",
+          y: 1.12,
+          x: 0,
+        },
+        margin: {
+          l: 70,
+          r: 30,
+          t: 70,
+          b: 60,
+        },
       }}
-      style={{ width: "100%", height: "500px" }}
-      useResizeHandler={true}
+      config={{
+        responsive: true,
+        displaylogo: false,
+      }}
+      style={{ width: "100%" }}
     />
   );
 }

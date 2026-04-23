@@ -1,156 +1,116 @@
 import type { CalculationParams, PotentialPoint } from "../types";
 
-type GPUKernelContext = {
-  thread: {
-    x: number;
-    y: number;
-    z: number;
-  };
-};
+const E2 = 1.44;
 
 function buildGrid(params: CalculationParams): number[] {
   const n = Math.floor((params.rMax - params.rMin) / params.dR) + 1;
   return Array.from({ length: n }, (_, i) => params.rMin + i * params.dR);
 }
 
-function cbrtA(a: number): number {
-  return Math.cbrt(a);
+function effectiveRadius(r0: number, A: number): number {
+  return r0 * Math.cbrt(A);
+}
+
+function effectiveDiffuseness(a: number): number {
+  return Math.max(a, 0.05);
+}
+
+function densityModelFactor(model: "2pF" | "gaussian"): number {
+  return model === "gaussian" ? 0.92 : 1.0;
+}
+
+function nnStrength(model: "M3Y-Reid" | "M3Y-Paris"): number {
+  return model === "M3Y-Paris" ? 52 : 58;
+}
+
+function densityDependenceFactor(useDensityDependence: boolean): number {
+  return useDensityDependence ? 0.88 : 1.0;
+}
+
+function energyFactor(energyMeV: number): number {
+  return 1 + 0.0015 * energyMeV;
+}
+
+function realNuclearPotential(R: number, params: CalculationParams): number {
+  const Rp = effectiveRadius(params.r0Proj, params.projectileA);
+  const Rt = effectiveRadius(params.r0Targ, params.targetA);
+
+  const aP = effectiveDiffuseness(params.aProj);
+  const aT = effectiveDiffuseness(params.aTarg);
+
+  const Rn = Rp + Rt;
+  const aN = 0.5 * (aP + aT);
+
+  const baseV0 =
+    nnStrength(params.nnModel) *
+    densityModelFactor(params.projectileDensityModel) *
+    densityModelFactor(params.targetDensityModel) *
+    densityDependenceFactor(params.useDensityDependence) *
+    energyFactor(params.energyMeV);
+
+  const ws = 1 / (1 + Math.exp((R - Rn) / aN));
+
+  return -params.nReal * baseV0 * ws;
+}
+
+function coulombPotential(
+  R: number,
+  Zp: number,
+  Zt: number,
+  rc: number,
+  Ap: number,
+  At: number
+): number {
+  const Rc = rc * (Math.cbrt(Ap) + Math.cbrt(At));
+
+  if (R < 1e-8) {
+    return (3 * Zp * Zt * E2) / (2 * Rc);
+  }
+
+  if (R < Rc) {
+    return (Zp * Zt * E2 * (3 - (R * R) / (Rc * Rc))) / (2 * Rc);
+  }
+
+  return (Zp * Zt * E2) / R;
+}
+
+function woodsSaxonImag(R: number, params: CalculationParams): number {
+  const aW = Math.max(params.aw, 0.05);
+  const RW =
+    params.rw * (Math.cbrt(params.projectileA) + Math.cbrt(params.targetA));
+
+  return -params.w0 / (1 + Math.exp((R - RW) / aW));
 }
 
 export function calculatePotential(params: CalculationParams): {
   points: PotentialPoint[];
   mode: string;
 } {
-  const grid = buildGrid(params);
+  const Rgrid = buildGrid(params);
 
-  const ap13 = cbrtA(params.projectileA);
-  const at13 = cbrtA(params.targetA);
+  const points = Rgrid.map((R) => {
+    const vN = realNuclearPotential(R, params);
+    const vC = coulombPotential(
+      R,
+      params.projectileZ,
+      params.targetZ,
+      params.rc,
+      params.projectileA,
+      params.targetA
+    );
+    const w = woodsSaxonImag(R, params);
 
-  const realRadius = params.rv * (ap13 + at13);
-  const imagRadius = params.rw * (ap13 + at13);
+    return {
+      r: R,
+      vN,
+      vC,
+      v: vN + vC,
+      w,
+    };
+  });
 
-  const coulombRadius = 1.25 * (ap13 + at13);
-
-  const massFactor =
-    (params.projectileA * params.targetA) /
-    (params.projectileA + params.targetA);
-
-  const asymmetry =
-    Math.abs(params.targetA - params.projectileA) /
-    (params.targetA + params.projectileA);
-
-  const energyFactor = 1 / (1 + params.energyMeV / 200);
-
-  const effectiveV0 =
-    params.v0 * (1 + 0.15 * asymmetry) * energyFactor * (1 + 0.02 * massFactor);
-
-  const effectiveW0 =
-    params.w0 * (1 + params.energyMeV / 100) * (1 + 0.01 * massFactor);
-
-  const zProd = params.projectileZ * params.targetZ;
-  const e2 = 1.44;
-
-  try {
-    const gpu = new window.GPU({ mode: "webgl" });
-
-    const kernelV = gpu
-      .createKernel(function (
-        this: GPUKernelContext,
-        rMin: number,
-        dR: number,
-        radius: number,
-        diffuseness: number,
-        depth: number,
-        zProd: number,
-        coulombRadius: number,
-        e2: number
-      ) {
-        const r = rMin + this.thread.x * dR;
-        const nuclear = -depth / (1 + Math.exp((r - radius) / diffuseness));
-
-        let coulomb = 0;
-        if (r > 1e-6) {
-          if (r < coulombRadius) {
-            coulomb =
-              (zProd * e2 * (3 - (r * r) / (coulombRadius * coulombRadius))) /
-              (2 * coulombRadius);
-          } else {
-            coulomb = (zProd * e2) / r;
-          }
-        }
-
-        return nuclear + coulomb;
-      })
-      .setOutput([grid.length]);
-
-    const kernelW = gpu
-      .createKernel(function (
-        this: GPUKernelContext,
-        rMin: number,
-        dR: number,
-        radius: number,
-        diffuseness: number,
-        depth: number
-      ) {
-        const r = rMin + this.thread.x * dR;
-        return -depth / (1 + Math.exp((r - radius) / diffuseness));
-      })
-      .setOutput([grid.length]);
-
-    const vArr = kernelV(
-      params.rMin,
-      params.dR,
-      realRadius,
-      params.av,
-      effectiveV0,
-      zProd,
-      coulombRadius,
-      e2
-    ) as number[];
-
-    const wArr = kernelW(
-      params.rMin,
-      params.dR,
-      imagRadius,
-      params.aw,
-      effectiveW0
-    ) as number[];
-
-    const points = grid.map((r, i) => ({
-      r,
-      v: Number(vArr[i]),
-      w: Number(wArr[i]),
-    }));
-
-    gpu.destroy();
-
-    return { points, mode: "GPU/WebGL" };
-  } catch {
-    const points = grid.map((r) => {
-      const nuclearV =
-        -effectiveV0 / (1 + Math.exp((r - realRadius) / params.av));
-
-      let coulomb = 0;
-      if (r > 1e-6) {
-        if (r < coulombRadius) {
-          coulomb =
-            (zProd * e2 * (3 - (r * r) / (coulombRadius * coulombRadius))) /
-            (2 * coulombRadius);
-        } else {
-          coulomb = (zProd * e2) / r;
-        }
-      }
-
-      const imag =
-        -effectiveW0 / (1 + Math.exp((r - imagRadius) / params.aw));
-
-      return {
-        r,
-        v: nuclearV + coulomb,
-        w: imag,
-      };
-    });
-
-    return { points, mode: "CPU fallback" };
-  }
+  return {
+    points,
+    mode: "Calc",
+  };
 }
