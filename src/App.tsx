@@ -1,8 +1,11 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import "./App.css";
 import { ParameterForm } from "./components/ParameterForm";
 import { PotentialChart } from "./components/PotentialChart";
+import { buildDwuck4Input, exportDwuck4Input } from "./utils/dwuck4";
+import { exportPreset, exportResult } from "./utils/fileUtils";
 import { calculatePotential } from "./utils/calculatePotential";
-import type { CalculationParams, PotentialPoint } from "./types";
+import type { CalculationParams, CalculationResult } from "./types";
 
 const initialParams: CalculationParams = {
   projectileZ: 3,
@@ -37,49 +40,179 @@ const initialParams: CalculationParams = {
   rc: 1.25,
 };
 
-function exportJson(points: PotentialPoint[], params: CalculationParams) {
-  const blob = new Blob([JSON.stringify({ params, points }, null, 2)], {
-    type: "application/json",
-  });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "potential.json";
-  a.click();
-  URL.revokeObjectURL(url);
+function formatNumber(value: number, digits = 3) {
+  return Number.isFinite(value) ? value.toFixed(digits) : "—";
 }
 
 export default function App() {
   const [params, setParams] = useState<CalculationParams>(initialParams);
-  const [points, setPoints] = useState<PotentialPoint[]>([]);
-  const [status, setStatus] = useState("Готово");
+  const [result, setResult] = useState<CalculationResult | null>(null);
+  const [status, setStatus] = useState("Готово к расчёту");
+  const [isRunning, setIsRunning] = useState(false);
 
-  const runCalculation = () => {
+  const handleRun = () => {
+    setIsRunning(true);
     setStatus("Расчёт...");
-    const result = calculatePotential(params);
-    setPoints(result.points);
-    setStatus(`Успешно (${result.mode})`);
+
+    requestAnimationFrame(() => {
+      try {
+        const nextResult = calculatePotential(params);
+        setResult(nextResult);
+        setStatus(
+          `Успешно: ${nextResult.mode}, ${nextResult.summary.elapsedMs.toFixed(
+            1
+          )} мс`
+        );
+      } catch (error) {
+        console.error(error);
+        setStatus("Ошибка расчёта");
+      } finally {
+        setIsRunning(false);
+      }
+    });
   };
 
-  return (
-    <div style={{ padding: 24, display: "grid", gap: 24 }}>
-      <h1>Расчёт ядро-ядерного потенциала</h1>
-      <p>{status}</p>
+  const dwuckPreview = useMemo(() => {
+    if (!result) return "";
+    return buildDwuck4Input(params, result.summary);
+  }, [params, result]);
 
-      <div style={{ display: "grid", gridTemplateColumns: "460px 1fr", gap: 24 }}>
+  const summary = result?.summary;
+
+  return (
+    <div className="app-shell">
+      <header className="hero-card">
+        <div>
+          <p className="eyebrow">Научное веб-приложение</p>
+          <h1>Расчёт ядро-ядерного потенциала</h1>
+          <p className="hero-card__text">
+            DFM-inspired расчёт с раздельным выводом прямой, обменной,
+            кулоновской и мнимой частей потенциала.
+          </p>
+        </div>
+
+        <div className="status-badge">{status}</div>
+      </header>
+
+      <main className="app-layout">
         <ParameterForm
           params={params}
           onChange={setParams}
-          onRun={runCalculation}
+          onRun={handleRun}
+          isRunning={isRunning}
         />
 
-        <div>
-          <button onClick={() => exportJson(points, params)} disabled={!points.length}>
-            Экспорт JSON
-          </button>
-          <PotentialChart points={points} />
-        </div>
-      </div>
+        <section className="content-column">
+          <div className="toolbar">
+            <button
+              className="button"
+              onClick={() => result && exportResult(params, result)}
+              disabled={!result}
+            >
+              Экспорт результата JSON
+            </button>
+
+            <button
+              className="button"
+              onClick={() => exportPreset("preset", params)}
+            >
+              Экспорт пресета
+            </button>
+
+            <button
+              className="button button--accent"
+              onClick={() => result && exportDwuck4Input(params, result.summary)}
+              disabled={!result}
+            >
+              Экспорт DWUCK4
+            </button>
+          </div>
+
+          <section className="metrics-grid">
+            <article className="metric-card">
+              <span className="metric-card__label">Время расчёта</span>
+              <strong className="metric-card__value">
+                {summary ? `${formatNumber(summary.elapsedMs, 1)} мс` : "—"}
+              </strong>
+            </article>
+
+            <article className="metric-card">
+              <span className="metric-card__label">Точек по R</span>
+              <strong className="metric-card__value">
+                {summary?.pointsCount ?? "—"}
+              </strong>
+            </article>
+
+            <article className="metric-card">
+              <span className="metric-card__label">Минимум V(R)</span>
+              <strong className="metric-card__value">
+                {summary
+                  ? `${formatNumber(summary.vMin)} MeV @ ${formatNumber(
+                      summary.rAtVMin
+                    )} fm`
+                  : "—"}
+              </strong>
+            </article>
+
+            <article className="metric-card">
+              <span className="metric-card__label">Барьер V(R)</span>
+              <strong className="metric-card__value">
+                {summary
+                  ? `${formatNumber(summary.vBarrier)} MeV @ ${formatNumber(
+                      summary.rAtBarrier
+                    )} fm`
+                  : "—"}
+              </strong>
+            </article>
+
+            <article className="metric-card">
+              <span className="metric-card__label">Макс. итераций VEX</span>
+              <strong className="metric-card__value">
+                {summary?.maxIterations ?? "—"}
+              </strong>
+            </article>
+
+            <article className="metric-card">
+              <span className="metric-card__label">Режим</span>
+              <strong className="metric-card__value">
+                {result?.mode ?? "—"}
+              </strong>
+            </article>
+          </section>
+
+          <section className="panel">
+            <div className="panel__head">
+              <div>
+                <h2 className="panel__title">График потенциала</h2>
+                <p className="panel__subtitle">
+                  Отдельно показаны V_D, V_EX, V_N, V_C, V и W.
+                </p>
+              </div>
+            </div>
+
+            <PotentialChart points={result?.points ?? []} />
+          </section>
+
+          <section className="panel">
+            <div className="panel__head">
+              <div>
+                <h2 className="panel__title">Предпросмотр DWUCK4 input</h2>
+                <p className="panel__subtitle">
+                  Генерируется по текущим параметрам и summary расчёта.
+                </p>
+              </div>
+            </div>
+
+            <textarea
+              className="dwuck-preview"
+              readOnly
+              value={
+                dwuckPreview || "После расчёта здесь появится текст dwuck4.inp"
+              }
+            />
+          </section>
+        </section>
+      </main>
     </div>
   );
 }

@@ -1,18 +1,4 @@
-type GPUKernel = ((...args: any[]) => any) & {
-  setOutput(output: number[]): GPUKernel;
-};
+/// <reference types="vite/client" />
 
-type GPURuntime = {
-  createKernel(fn: Function): GPUKernel;
-  destroy(): void;
-};
-
-declare global {
-  interface Window {
-    GPU: {
-      new (settings?: { mode?: string }): GPURuntime;
-    };
-  }
-}
-
-export {};
+declare module "react-plotly.js/factory";
+declare module "plotly.js-dist-min";

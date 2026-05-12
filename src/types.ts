@@ -1,5 +1,4 @@
 export type DensityModel = "2pF" | "gaussian";
-
 export type NNModel = "M3Y-Reid" | "M3Y-Paris";
 
 export type CalculationParams = {
@@ -37,10 +36,29 @@ export type CalculationParams = {
 
 export type PotentialPoint = {
   r: number;
+  vD: number;
+  vEX: number;
   vN: number;
   vC: number;
   v: number;
   w: number;
+  kLocal: number;
+};
+
+export type CalculationSummary = {
+  elapsedMs: number;
+  pointsCount: number;
+  vMin: number;
+  rAtVMin: number;
+  vBarrier: number;
+  rAtBarrier: number;
+  maxIterations: number;
+};
+
+export type CalculationResult = {
+  points: PotentialPoint[];
+  mode: string;
+  summary: CalculationSummary;
 };
 
 export type Preset = {
