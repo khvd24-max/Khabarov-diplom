@@ -183,7 +183,6 @@ function imaginaryPotential(R: number, params: CalculationParams) {
 
 function localMomentum(
   params: CalculationParams,
-  R: number,
   vN: number,
   vC: number
 ) {
@@ -268,7 +267,7 @@ export function calculatePotential(params: CalculationParams): CalculationResult
 
     for (iter = 1; iter <= 20; iter += 1) {
       const vNTrial = params.nReal * (vD + previous);
-      kLocal = localMomentum(params, R, vNTrial, vC);
+      kLocal = localMomentum(params, vNTrial, vC);
 
       const sEff =
         0.8 +
