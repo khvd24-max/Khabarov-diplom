@@ -66,9 +66,6 @@ export function ParameterForm({
       <div className="panel__head">
         <div>
           <h2 className="panel__title">Параметры расчёта</h2>
-          <p className="panel__subtitle">
-            Double-folding inspired модель, экспорт JSON и DWUCK4.
-          </p>
         </div>
 
         <button

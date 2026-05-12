@@ -85,10 +85,6 @@ export default function App() {
         <div>
           <p className="eyebrow">Научное веб-приложение</p>
           <h1>Расчёт ядро-ядерного потенциала</h1>
-          <p className="hero-card__text">
-            DFM-inspired расчёт с раздельным выводом прямой, обменной,
-            кулоновской и мнимой частей потенциала.
-          </p>
         </div>
 
         <div className="status-badge">{status}</div>
